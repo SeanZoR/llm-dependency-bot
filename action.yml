@@ -53,6 +53,9 @@ outputs:
 runs:
   using: composite
   steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+
   - name: Setup Python
     uses: actions/setup-python@v5
     with:
@@ -73,12 +76,13 @@ runs:
       elif [ "${{ github.event_name }}" = "pull_request" ]; then
         echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
       elif [ "${{ github.event_name }}" = "workflow_run" ]; then
-        # For workflow_run events, find PR from SHA
-        PR_NUMBER=$(gh pr list --search "${{ github.event.workflow_run.head_sha }}" --json number --jq '.[0].number')
+        # For workflow_run events, find PR from the head branch
+        HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
+        PR_NUMBER=$(gh pr list --head "$HEAD_BRANCH" --json number --jq '.[0].number' || echo "")
         if [ -n "$PR_NUMBER" ]; then
           echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
         else
-          echo "Could not determine PR number"
+          echo "Could not find PR for branch: $HEAD_BRANCH"
           exit 1
         fi
       else
