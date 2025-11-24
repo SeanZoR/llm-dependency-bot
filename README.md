@@ -85,7 +85,7 @@ jobs:
       checks: read          # Read CI status
 
     steps:
-      - uses: yourusername/llm-dependency-bot@v1
+      - uses: SeanZoR/llm-dependency-bot@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -97,9 +97,10 @@ jobs:
 2. Add it to your repo: Settings → Secrets and variables → Actions
 3. Create secret: `ANTHROPIC_API_KEY`
 
-### 3. Done!
+### 3. Done
 
 The bot will now automatically analyze all dependency PRs and:
+
 - ✅ Auto-merge safe updates (patch/minor with passing CI)
 - 👤 Request review for risky updates (major versions, breaking changes)
 - ❌ Block problematic updates (failing CI, known vulnerabilities)
@@ -145,7 +146,7 @@ Example: A major version update might be auto-merged if Claude determines it's b
 ### Basic Configuration
 
 ```yaml
-- uses: yourusername/llm-dependency-bot@v1
+- uses: SeanZoR/llm-dependency-bot@v1
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -156,7 +157,7 @@ Example: A major version update might be auto-merged if Claude determines it's b
 ### Advanced Configuration
 
 ```yaml
-- uses: yourusername/llm-dependency-bot@v1
+- uses: SeanZoR/llm-dependency-bot@v1
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -268,6 +269,7 @@ Additional rules for my organization:
 ## 🤝 Contributing
 
 We love contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+
 - How to set up your development environment
 - Code style guidelines
 - How to submit PRs
@@ -291,6 +293,7 @@ Claude API costs are very low for this use case:
 - **Free tier:** Anthropic offers free credits for testing
 
 Compare to:
+
 - Engineer time reviewing deps: $50-100/hour
 - Cost of missing a security update: 🚨
 
@@ -324,6 +327,7 @@ Absolutely! The bot analyzes each PR individually and understands the context.
 ### What languages/ecosystems are supported?
 
 All of them! The bot works with:
+
 - JavaScript/TypeScript (npm, yarn, pnpm)
 - Python (pip, poetry)
 - Ruby (bundler)
@@ -357,9 +361,9 @@ MIT License - see [LICENSE](LICENSE) for details
 ## 💬 Support
 
 - 📖 [Documentation](docs/)
-- 🐛 [Issue Tracker](https://github.com/yourusername/llm-dependency-bot/issues)
-- 💡 [Discussions](https://github.com/yourusername/llm-dependency-bot/discussions)
-- 🌟 [Star this repo](https://github.com/yourusername/llm-dependency-bot) if you find it useful!
+- 🐛 [Issue Tracker](https://github.com/SeanZoR/llm-dependency-bot/issues)
+- 💡 [Discussions](https://github.com/SeanZoR/llm-dependency-bot/discussions)
+- 🌟 [Star this repo](https://github.com/SeanZoR/llm-dependency-bot) if you find it useful!
 
 ---
 

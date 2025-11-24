@@ -5,6 +5,7 @@ This guide shows how to configure LLM Dependency Bot for monorepos with multiple
 ## Scenario
 
 You have a monorepo with:
+
 - Frontend (npm/pnpm)
 - Backend (pip/poetry)
 - Infrastructure (Terraform)
@@ -35,7 +36,7 @@ jobs:
       checks: read
 
     steps:
-      - uses: yourusername/llm-dependency-bot@v1
+      - uses: SeanZoR/llm-dependency-bot@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -59,7 +60,7 @@ jobs:
       contains(github.event.pull_request.title, 'frontend/')
     runs-on: ubuntu-latest
     steps:
-      - uses: yourusername/llm-dependency-bot@v1
+      - uses: SeanZoR/llm-dependency-bot@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -71,7 +72,7 @@ jobs:
       contains(github.event.pull_request.title, 'backend/')
     runs-on: ubuntu-latest
     steps:
-      - uses: yourusername/llm-dependency-bot@v1
+      - uses: SeanZoR/llm-dependency-bot@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -96,6 +97,7 @@ updates:
 ```
 
 Bot will:
+
 - Auto-merge: Patch updates, type definitions
 - Review: Minor updates, framework changes
 - Block: Major updates without CI
@@ -116,6 +118,7 @@ updates:
 ```
 
 Bot will:
+
 - Auto-merge: Patch updates, security fixes
 - Review: Minor updates, ML library changes
 - Block: Major updates, framework changes
@@ -180,7 +183,7 @@ jobs:
       contains(github.event.pull_request.title, matrix.path)
 
     steps:
-      - uses: yourusername/llm-dependency-bot@v1
+      - uses: SeanZoR/llm-dependency-bot@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -195,7 +198,7 @@ jobs:
 # Frontend: Aggressive auto-merge
 frontend-deps:
   steps:
-    - uses: yourusername/llm-dependency-bot@v1
+    - uses: SeanZoR/llm-dependency-bot@v1
       with:
         auto-merge-enabled: true
         merge-method: squash
@@ -203,7 +206,7 @@ frontend-deps:
 # Backend: Conservative, rebase to keep history
 backend-deps:
   steps:
-    - uses: yourusername/llm-dependency-bot@v1
+    - uses: SeanZoR/llm-dependency-bot@v1
       with:
         auto-merge-enabled: true
         merge-method: rebase
@@ -218,7 +221,7 @@ jobs:
     # First, auto-merge to staging branch
     if: github.base_ref == 'staging'
     steps:
-      - uses: yourusername/llm-dependency-bot@v1
+      - uses: SeanZoR/llm-dependency-bot@v1
         with:
           auto-merge-enabled: true
 
@@ -226,7 +229,7 @@ jobs:
     # Then, require review for production
     if: github.base_ref == 'main'
     steps:
-      - uses: yourusername/llm-dependency-bot@v1
+      - uses: SeanZoR/llm-dependency-bot@v1
         with:
           auto-merge-enabled: false  # Always review for prod
 ```
@@ -245,7 +248,7 @@ steps:
       fi
 
   - name: Run bot (stricter for root)
-    uses: yourusername/llm-dependency-bot@v1
+    uses: SeanZoR/llm-dependency-bot@v1
     with:
       auto-merge-enabled: ${{ steps.check-root.outputs.is_root != 'true' }}
 ```
@@ -326,7 +329,7 @@ jobs:
           fi
 
       - name: Run LLM Dependency Bot
-        uses: yourusername/llm-dependency-bot@v1
+        uses: SeanZoR/llm-dependency-bot@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}

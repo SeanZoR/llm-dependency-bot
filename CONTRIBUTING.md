@@ -5,6 +5,7 @@ Thank you for your interest in contributing! This project aims to demonstrate an
 ## 🎯 Project Vision
 
 This bot showcases:
+
 - **True agentic AI** - LLM as reasoning engine, not just pattern matching
 - **Transparent AI** - Explainable decisions with natural language reasoning
 - **Production-ready code** - Clean architecture, comprehensive tests, type safety
@@ -24,7 +25,7 @@ This bot showcases:
 1. **Fork and clone the repository**
 
 ```bash
-git clone https://github.com/yourusername/llm-dependency-bot.git
+git clone https://github.com/SeanZoR/llm-dependency-bot.git
 cd llm-dependency-bot
 ```
 
@@ -117,6 +118,7 @@ git commit -m "feat: add slack notification support"
 ```
 
 Commit message format:
+
 - `feat:` - New feature
 - `fix:` - Bug fix
 - `docs:` - Documentation
@@ -287,6 +289,7 @@ Documentation lives in `docs/`:
 ### Good First Issues
 
 Look for issues labeled `good-first-issue`:
+
 - Documentation improvements
 - Test additions
 - Simple bug fixes
@@ -325,7 +328,9 @@ What actually happens
 
 ## Logs
 ```
+
 Relevant logs or error messages
+
 ```
 ```
 
@@ -353,11 +358,13 @@ Screenshots, examples, references
 ## 🏆 Recognition
 
 Contributors are recognized in:
+
 - GitHub contributors list
 - Release notes
 - README acknowledgments
 
 Significant contributions may earn you:
+
 - Maintainer status
 - Your name in the hall of fame
 - Swag (if/when we have it!)
@@ -380,12 +387,14 @@ Before submitting:
 We follow the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
 
 **Expected behavior:**
+
 - Be respectful and inclusive
 - Accept constructive criticism
 - Focus on what's best for the community
 - Show empathy towards others
 
 **Unacceptable behavior:**
+
 - Harassment or discriminatory language
 - Trolling or insulting comments
 - Public or private harassment
@@ -393,8 +402,8 @@ We follow the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## 📞 Questions?
 
-- 💬 [GitHub Discussions](https://github.com/yourusername/llm-dependency-bot/discussions)
-- 🐛 [Issue Tracker](https://github.com/yourusername/llm-dependency-bot/issues)
+- 💬 [GitHub Discussions](https://github.com/SeanZoR/llm-dependency-bot/discussions)
+- 🐛 [Issue Tracker](https://github.com/SeanZoR/llm-dependency-bot/issues)
 - 📧 Email: [maintainer email]
 
 ## 📄 License

@@ -7,7 +7,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_run:
-    workflows: ["CI", "Security Scan"]
+    workflows: [CI, Security Scan]
     types: [completed]
 
 jobs:
@@ -25,39 +25,39 @@ jobs:
       statuses: read
 
     steps:
-      - name: Run LLM Dependency Bot
-        uses: yourusername/llm-dependency-bot@v1
-        with:
+    - name: Run LLM Dependency Bot
+      uses: SeanZoR/llm-dependency-bot@v1
+      with:
           # GitHub token (required)
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 
           # Anthropic API key (required)
-          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+        anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
 
           # Enable or disable auto-merge (default: true)
-          auto-merge-enabled: true
+        auto-merge-enabled: true
 
           # Merge method: merge, squash, or rebase (default: squash)
-          merge-method: squash
+        merge-method: squash
 
           # Critical dependencies requiring extra scrutiny
           # These will always require human review regardless of update type
-          critical-dependencies: |
-            react,
-            next,
-            fastapi,
-            django,
-            langchain,
-            openai
+        critical-dependencies: |
+          react,
+          next,
+          fastapi,
+          django,
+          langchain,
+          openai
 
       # Optional: Send notification on completion
-      - name: Notify team
-        if: always()
-        uses: slackapi/slack-github-action@v1
-        with:
-          payload: |
-            {
-              "text": "Dependency bot completed for PR #${{ github.event.pull_request.number }}"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+    - name: Notify team
+      if: always()
+      uses: slackapi/slack-github-action@v1
+      with:
+        payload: |
+          {
+            "text": "Dependency bot completed for PR #${{ github.event.pull_request.number }}"
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

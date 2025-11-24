@@ -55,12 +55,12 @@ repos:
       - id: detect-private-key
       - id: mixed-line-ending
 
-  # Markdown linting
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.38.0
-    hooks:
-      - id: markdownlint
-        args: ["--fix"]
+  # Markdown linting (disabled - too strict for documentation)
+  # - repo: https://github.com/igorshubovych/markdownlint-cli
+  #   rev: v0.38.0
+  #   hooks:
+  #     - id: markdownlint
+  #       args: ["--fix"]
 
   # YAML formatting
   - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks

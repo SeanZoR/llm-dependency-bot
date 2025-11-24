@@ -15,19 +15,21 @@ Author: LLM Dependency Bot Contributors
 License: MIT
 """
 
-import os
-import sys
 import json
+import os
 import re
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass, asdict
+import sys
+from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Optional
+
 import requests
 from anthropic import Anthropic
 
 
 class RiskLevel(Enum):
     """Risk assessment levels for dependency updates."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -36,6 +38,7 @@ class RiskLevel(Enum):
 
 class MergeDecision(Enum):
     """Possible merge decisions the agent can make."""
+
     AUTO_MERGE = "auto_merge"
     REQUIRE_APPROVAL = "require_approval"
     DO_NOT_MERGE = "do_not_merge"
@@ -49,10 +52,11 @@ class PRContext:
     This dataclass captures all information the agent needs to make
     an informed decision about a dependency update.
     """
+
     number: int
     title: str
     body: str
-    labels: List[str]
+    labels: list[str]
     author: str
     is_draft: bool
     mergeable: bool
@@ -65,7 +69,7 @@ class PRContext:
     dependency_name: str
     is_security_update: bool
     target_branch: str
-    files_changed: List[str]
+    files_changed: list[str]
 
 
 class LLMDependencyBot:
@@ -134,7 +138,7 @@ context and any tool results. Be conservative - when in doubt, require human app
         self.headers = {
             "Authorization": f"Bearer {github_token}",
             "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28"
+            "X-GitHub-Api-Version": "2022-11-28",
         }
 
         # Initialize Claude client
@@ -142,13 +146,25 @@ context and any tool results. Be conservative - when in doubt, require human app
 
         # Configuration for critical dependencies that need extra scrutiny
         self.critical_dependencies = [
-            "next", "react", "vue", "angular", "svelte",
-            "fastapi", "django", "flask", "express",
-            "langchain", "openai", "anthropic",
-            "numpy", "pandas", "tensorflow", "pytorch"
+            "next",
+            "react",
+            "vue",
+            "angular",
+            "svelte",
+            "fastapi",
+            "django",
+            "flask",
+            "express",
+            "langchain",
+            "openai",
+            "anthropic",
+            "numpy",
+            "pandas",
+            "tensorflow",
+            "pytorch",
         ]
 
-    def _make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
+    def _make_request(self, method: str, endpoint: str, **kwargs: Any) -> requests.Response:
         """
         Make a GitHub API request with error handling.
 
@@ -217,19 +233,21 @@ context and any tool results. Be conservative - when in doubt, require human app
             dependency_name=dep_name,
             is_security_update=is_security,
             target_branch=pr_data["base"]["ref"],
-            files_changed=files
+            files_changed=files,
         )
 
         # Log gathered context
         print(f"   ✓ Author: {context.author}")
         print(f"   ✓ Labels: {', '.join(context.labels) if context.labels else 'none'}")
         print(f"   ✓ CI Status: {context.ci_status}")
-        print(f"   ✓ Update: {context.dependency_name} {context.old_version} → {context.new_version}")
+        print(
+            f"   ✓ Update: {context.dependency_name} {context.old_version} → {context.new_version}"
+        )
         print(f"   ✓ Type: {context.update_type}")
 
         return context
 
-    def _get_ci_status(self, pr_number: int, sha: str) -> Tuple[str, Optional[str]]:
+    def _get_ci_status(self, pr_number: int, sha: str) -> tuple[str, Optional[str]]:
         """
         Get the combined CI/CD status for a PR.
 
@@ -265,7 +283,7 @@ context and any tool results. Be conservative - when in doubt, require human app
             print(f"   ⚠️  Could not fetch CI status: {e}")
             return "unknown", None
 
-    def _parse_dependency_info(self, title: str, body: str) -> Tuple[str, str, str, str]:
+    def _parse_dependency_info(self, title: str, body: str) -> tuple[str, str, str, str]:
         """
         Parse dependency update information from PR title and body.
 
@@ -284,25 +302,25 @@ context and any tool results. Be conservative - when in doubt, require human app
         new_version = ""
 
         # Extract dependency name (Dependabot format)
-        bump_match = re.search(r'Bump (.+?) from', title, re.IGNORECASE)
+        bump_match = re.search(r"Bump (.+?) from", title, re.IGNORECASE)
         if bump_match:
             dependency_name = bump_match.group(1).strip()
 
         # Renovate format
         if not bump_match:
-            renovate_match = re.search(r'Update (.+?) to', title, re.IGNORECASE)
+            renovate_match = re.search(r"Update (.+?) to", title, re.IGNORECASE)
             if renovate_match:
                 dependency_name = renovate_match.group(1).strip()
 
         # Extract version information
-        version_match = re.search(r'from ([\d.]+(?:-[\w.]+)?) to ([\d.]+(?:-[\w.]+)?)', title)
+        version_match = re.search(r"from ([\d.]+(?:-[\w.]+)?) to ([\d.]+(?:-[\w.]+)?)", title)
         if version_match:
             old_version = version_match.group(1)
             new_version = version_match.group(2)
 
             # Determine semantic version update type
-            old_parts = old_version.split('.')
-            new_parts = new_version.split('.')
+            old_parts = old_version.split(".")
+            new_parts = new_version.split(".")
 
             if len(old_parts) >= 1 and len(new_parts) >= 1:
                 if old_parts[0] != new_parts[0]:
@@ -314,7 +332,7 @@ context and any tool results. Be conservative - when in doubt, require human app
 
         return update_type, old_version, new_version, dependency_name
 
-    def _is_security_update(self, labels: List[Dict], body: str) -> bool:
+    def _is_security_update(self, labels: list[dict[str, Any]], body: str) -> bool:
         """
         Check if this is a security-related update.
 
@@ -329,13 +347,13 @@ context and any tool results. Be conservative - when in doubt, require human app
         body_lower = body.lower()
 
         return (
-            any("security" in label for label in label_names) or
-            "security" in body_lower or
-            "cve" in body_lower or
-            "vulnerability" in body_lower
+            any("security" in label for label in label_names)
+            or "security" in body_lower
+            or "cve" in body_lower
+            or "vulnerability" in body_lower
         )
 
-    def _get_files_changed(self, pr_number: int) -> List[str]:
+    def _get_files_changed(self, pr_number: int) -> list[str]:
         """
         Get list of files changed in the PR.
 
@@ -414,7 +432,7 @@ context and any tool results. Be conservative - when in doubt, require human app
             response = self._make_request(
                 "GET",
                 f"/repos/{self.repo}/pulls/{pr_number}",
-                headers={**self.headers, "Accept": "application/vnd.github.v3.diff"}
+                headers={**self.headers, "Accept": "application/vnd.github.v3.diff"},
             )
             diff = response.text
 
@@ -426,7 +444,7 @@ context and any tool results. Be conservative - when in doubt, require human app
         except Exception as e:
             return f"Could not fetch diff: {e}"
 
-    def _get_tools_definition(self) -> List[Dict[str, Any]]:
+    def _get_tools_definition(self) -> list[dict[str, Any]]:
         """
         Define tools that Claude can use during analysis.
 
@@ -440,17 +458,11 @@ context and any tool results. Be conservative - when in doubt, require human app
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "dependency": {
-                            "type": "string",
-                            "description": "Name of the dependency"
-                        },
-                        "version": {
-                            "type": "string",
-                            "description": "Version number"
-                        }
+                        "dependency": {"type": "string", "description": "Name of the dependency"},
+                        "version": {"type": "string", "description": "Version number"},
                     },
-                    "required": ["dependency", "version"]
-                }
+                    "required": ["dependency", "version"],
+                },
             },
             {
                 "name": "check_cve_database",
@@ -458,17 +470,11 @@ context and any tool results. Be conservative - when in doubt, require human app
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "dependency": {
-                            "type": "string",
-                            "description": "Name of the dependency"
-                        },
-                        "version": {
-                            "type": "string",
-                            "description": "Version number"
-                        }
+                        "dependency": {"type": "string", "description": "Name of the dependency"},
+                        "version": {"type": "string", "description": "Version number"},
                     },
-                    "required": ["dependency", "version"]
-                }
+                    "required": ["dependency", "version"],
+                },
             },
             {
                 "name": "analyze_diff",
@@ -476,17 +482,14 @@ context and any tool results. Be conservative - when in doubt, require human app
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "pr_number": {
-                            "type": "integer",
-                            "description": "Pull request number"
-                        }
+                        "pr_number": {"type": "integer", "description": "Pull request number"}
                     },
-                    "required": ["pr_number"]
-                }
-            }
+                    "required": ["pr_number"],
+                },
+            },
         ]
 
-    def _execute_tool(self, tool_name: str, tool_input: Dict[str, Any]) -> str:
+    def _execute_tool(self, tool_name: str, tool_input: dict[str, Any]) -> str:
         """
         Execute a tool call from Claude.
 
@@ -506,7 +509,7 @@ context and any tool results. Be conservative - when in doubt, require human app
         else:
             return f"Unknown tool: {tool_name}"
 
-    def decide_with_llm(self, context: PRContext) -> Tuple[MergeDecision, RiskLevel, str]:
+    def decide_with_llm(self, context: PRContext) -> tuple[MergeDecision, RiskLevel, str]:
         """
         DECISION LAYER: Use Claude to make intelligent merge decision.
 
@@ -526,8 +529,7 @@ context and any tool results. Be conservative - when in doubt, require human app
 
         # Check if this is a critical dependency
         is_critical = any(
-            crit in context.dependency_name.lower()
-            for crit in self.critical_dependencies
+            crit in context.dependency_name.lower() for crit in self.critical_dependencies
         )
 
         # Build the analysis prompt
@@ -575,7 +577,7 @@ Respond in JSON format:
                 max_tokens=4096,
                 system=self.AGENT_SYSTEM_PROMPT,
                 tools=self._get_tools_definition(),
-                messages=messages
+                messages=messages,
             )
 
             print(f"   💭 Claude iteration {iteration + 1}...")
@@ -597,16 +599,18 @@ Respond in JSON format:
                         tool_result = self._execute_tool(tool_name, tool_input)
 
                         # Prepare tool result for next message
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": content_block.id,
-                            "content": tool_result
-                        })
+                        tool_results.append(
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": content_block.id,
+                                "content": tool_result,
+                            }
+                        )
 
                 # Add assistant message with tool use
-                messages.append({"role": "assistant", "content": assistant_content})
+                messages.append({"role": "assistant", "content": assistant_content})  # type: ignore
                 # Add user message with tool results
-                messages.append({"role": "user", "content": tool_results})
+                messages.append({"role": "user", "content": tool_results})  # type: ignore
 
                 # Continue the loop
                 continue
@@ -620,12 +624,12 @@ Respond in JSON format:
             if hasattr(content_block, "text"):
                 final_text += content_block.text
 
-        print(f"\n   ✓ Claude's analysis complete\n")
+        print("\n   ✓ Claude's analysis complete\n")
 
         # Parse Claude's decision
         try:
             # Extract JSON from response
-            json_match = re.search(r'\{[\s\S]*\}', final_text)
+            json_match = re.search(r"\{[\s\S]*\}", final_text)
             if json_match:
                 decision_data = json.loads(json_match.group())
 
@@ -645,7 +649,9 @@ Respond in JSON format:
             print(f"   ⚠️  Error parsing Claude's response: {e}")
             return self._fallback_decision(context, final_text)
 
-    def _fallback_decision(self, context: PRContext, llm_response: str) -> Tuple[MergeDecision, RiskLevel, str]:
+    def _fallback_decision(
+        self, context: PRContext, llm_response: str
+    ) -> tuple[MergeDecision, RiskLevel, str]:
         """
         Fallback decision logic if LLM response cannot be parsed.
 
@@ -668,11 +674,7 @@ Respond in JSON format:
             return MergeDecision.REQUIRE_APPROVAL, RiskLevel.MEDIUM, reasoning
 
     def execute_action(
-        self,
-        context: PRContext,
-        decision: MergeDecision,
-        risk: RiskLevel,
-        reasoning: str
+        self, context: PRContext, decision: MergeDecision, risk: RiskLevel, reasoning: str
     ) -> None:
         """
         ACTION LAYER: Execute the decided action.
@@ -720,11 +722,13 @@ Merging automatically...
         merge_data = {
             "commit_title": f"🤖 {context.title}",
             "commit_message": f"Auto-merged by LLM Dependency Bot\n\nRisk: {risk.value}\n\n{reasoning[:500]}",
-            "merge_method": "squash"
+            "merge_method": "squash",
         }
 
         try:
-            self._make_request("PUT", f"/repos/{self.repo}/pulls/{context.number}/merge", json=merge_data)
+            self._make_request(
+                "PUT", f"/repos/{self.repo}/pulls/{context.number}/merge", json=merge_data
+            )
             print(f"   ✅ Successfully merged PR #{context.number}")
         except requests.exceptions.HTTPError as e:
             print(f"   ❌ Failed to merge: {e}")
@@ -756,10 +760,10 @@ Please review this update carefully before merging.
 
         try:
             self._add_labels(context.number, ["needs-review", "llm-flagged"])
-        except:
+        except Exception:  # noqa: E722
             print("   ⚠️  Could not add labels (may not have permission)")
 
-        print(f"   ✅ Added review request")
+        print("   ✅ Added review request")
 
     def _add_blocking_comment(self, context: PRContext, risk: RiskLevel, reasoning: str) -> None:
         """Add a blocking comment explaining why PR cannot be merged."""
@@ -785,22 +789,18 @@ Please resolve the issues identified above before merging.
 *Powered by [Claude 3.5 Sonnet](https://www.anthropic.com/claude) - Autonomous AI for intelligent dependency management*
 """
         self._add_comment(context.number, comment)
-        print(f"   ✅ Added blocking comment")
+        print("   ✅ Added blocking comment")
 
     def _add_comment(self, pr_number: int, body: str) -> None:
         """Add a comment to a PR."""
         self._make_request(
-            "POST",
-            f"/repos/{self.repo}/issues/{pr_number}/comments",
-            json={"body": body}
+            "POST", f"/repos/{self.repo}/issues/{pr_number}/comments", json={"body": body}
         )
 
-    def _add_labels(self, pr_number: int, labels: List[str]) -> None:
+    def _add_labels(self, pr_number: int, labels: list[str]) -> None:
         """Add labels to a PR."""
         self._make_request(
-            "POST",
-            f"/repos/{self.repo}/issues/{pr_number}/labels",
-            json={"labels": labels}
+            "POST", f"/repos/{self.repo}/issues/{pr_number}/labels", json={"labels": labels}
         )
 
     def is_dependency_pr(self, pr_number: int) -> bool:
@@ -826,9 +826,9 @@ Please resolve the issues identified above before merging.
         title_lower = pr_data["title"].lower()
 
         return (
-            any("dep" in label for label in labels) or
-            "bump" in title_lower or
-            "update" in title_lower
+            any("dep" in label for label in labels)
+            or "bump" in title_lower
+            or "update" in title_lower
         )
 
     def run(self, pr_number: int) -> None:
@@ -842,8 +842,8 @@ Please resolve the issues identified above before merging.
             pr_number: Pull request number to analyze
         """
         print(f"\n{'='*70}")
-        print(f"🤖 LLM Dependency Bot - Autonomous AI Agent")
-        print(f"   Powered by Claude 3.5 Sonnet")
+        print("🤖 LLM Dependency Bot - Autonomous AI Agent")
+        print("   Powered by Claude 3.5 Sonnet")
         print(f"{'='*70}\n")
 
         # Validate this is a dependency PR
@@ -863,7 +863,7 @@ Please resolve the issues identified above before merging.
         self.execute_action(context, decision, risk, reasoning)
 
         print(f"\n{'='*70}")
-        print(f"✅ LLM Dependency Bot completed successfully")
+        print("✅ LLM Dependency Bot completed successfully")
         print(f"{'='*70}\n")
 
 
@@ -872,20 +872,26 @@ def main() -> None:
     # Get configuration from environment
     github_token = os.environ.get("GITHUB_TOKEN")
     repository = os.environ.get("GITHUB_REPOSITORY")
-    pr_number = os.environ.get("PR_NUMBER")
+    pr_number_str = os.environ.get("PR_NUMBER")
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
 
     # Validate required environment variables
-    if not all([github_token, repository, pr_number, anthropic_key]):
+    if not all([github_token, repository, pr_number_str, anthropic_key]):
         print("❌ Error: Missing required environment variables")
         print("   Required: GITHUB_TOKEN, GITHUB_REPOSITORY, PR_NUMBER, ANTHROPIC_API_KEY")
         sys.exit(1)
 
+    # Type guard to satisfy mypy
+    assert github_token is not None
+    assert repository is not None
+    assert pr_number_str is not None
+    assert anthropic_key is not None
+
     # Parse PR number
     try:
-        pr_number = int(pr_number)
+        pr_number = int(pr_number_str)
     except ValueError:
-        print(f"❌ Error: Invalid PR number: {pr_number}")
+        print(f"❌ Error: Invalid PR number: {pr_number_str}")
         sys.exit(1)
 
     # Initialize and run the bot
@@ -896,6 +902,7 @@ def main() -> None:
     except Exception as e:
         print(f"\n❌ Bot failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
