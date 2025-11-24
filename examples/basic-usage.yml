@@ -1,0 +1,28 @@
+# Basic Usage Example
+# This is the minimal configuration to get started
+
+name: LLM Dependency Bot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: ["CI"]  # Your CI workflow name
+    types: [completed]
+
+jobs:
+  dependency-bot:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+
+    steps:
+      - name: Run LLM Dependency Bot
+        uses: yourusername/llm-dependency-bot@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}

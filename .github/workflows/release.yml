@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Simple changelog from commits since last tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: |
+            ## What's Changed
+
+            ${{ steps.changelog.outputs.CHANGELOG }}
+
+            ## Installation
+
+            ```yaml
+            - uses: yourusername/llm-dependency-bot@${{ github.ref_name }}
+              with:
+                github-token: ${{ secrets.GITHUB_TOKEN }}
+                anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+            ```
+
+            ## Full Changelog
+
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.PREV_TAG }}...${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Update major version tag (v1, v2, etc.) to point to latest minor/patch
+  update-major-tag:
+    needs: release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update major version tag
+        run: |
+          # Extract major version (v1.2.3 -> v1)
+          TAG=${GITHUB_REF#refs/tags/}
+          MAJOR_VERSION=$(echo $TAG | cut -d. -f1)
+
+          # Update major version tag
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git tag -fa $MAJOR_VERSION -m "Update $MAJOR_VERSION to $TAG"
+          git push origin $MAJOR_VERSION --force
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

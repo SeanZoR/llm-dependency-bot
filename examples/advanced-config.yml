@@ -1,0 +1,63 @@
+# Advanced Configuration Example
+# This shows all available configuration options
+
+name: LLM Dependency Bot - Advanced
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: ["CI", "Security Scan"]
+    types: [completed]
+
+jobs:
+  dependency-bot:
+    # Run for both Dependabot and Renovate
+    if: |
+      github.actor == 'dependabot[bot]' ||
+      github.actor == 'renovate[bot]'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+      statuses: read
+
+    steps:
+      - name: Run LLM Dependency Bot
+        uses: yourusername/llm-dependency-bot@v1
+        with:
+          # GitHub token (required)
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+          # Anthropic API key (required)
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          # Enable or disable auto-merge (default: true)
+          auto-merge-enabled: true
+
+          # Merge method: merge, squash, or rebase (default: squash)
+          merge-method: squash
+
+          # Critical dependencies requiring extra scrutiny
+          # These will always require human review regardless of update type
+          critical-dependencies: |
+            react,
+            next,
+            fastapi,
+            django,
+            langchain,
+            openai
+
+      # Optional: Send notification on completion
+      - name: Notify team
+        if: always()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "Dependency bot completed for PR #${{ github.event.pull_request.number }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}

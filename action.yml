@@ -1,0 +1,97 @@
+name: 'LLM Dependency Bot'
+description: 'Autonomous AI agent powered by Claude that intelligently manages dependency updates'
+author: 'LLM Dependency Bot Contributors'
+
+branding:
+  icon: 'git-pull-request'
+  color: 'blue'
+
+inputs:
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+    default: ${{ github.token }}
+
+  anthropic-api-key:
+    description: 'Anthropic API key for Claude access'
+    required: true
+
+  pr-number:
+    description: 'Pull request number to analyze (auto-detected if not provided)'
+    required: false
+
+  auto-merge-enabled:
+    description: 'Enable auto-merge for low-risk updates'
+    required: false
+    default: 'true'
+
+  merge-method:
+    description: 'Merge method to use (merge, squash, rebase)'
+    required: false
+    default: 'squash'
+
+  critical-dependencies:
+    description: 'Comma-separated list of critical dependencies requiring extra scrutiny'
+    required: false
+    default: ''
+
+outputs:
+  decision:
+    description: 'Merge decision made by the bot (auto_merge, require_approval, do_not_merge)'
+
+  risk-level:
+    description: 'Risk level assessed (low, medium, high, critical)'
+
+  reasoning:
+    description: 'Claude AI reasoning for the decision'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python3 -m pip install --upgrade pip
+        pip install requests anthropic
+
+    - name: Determine PR number
+      id: pr-number
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.pr-number }}" ]; then
+          echo "number=${{ inputs.pr-number }}" >> $GITHUB_OUTPUT
+        elif [ "${{ github.event_name }}" = "pull_request" ]; then
+          echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+        elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+          # For workflow_run events, find PR from SHA
+          PR_NUMBER=$(gh pr list --search "${{ github.event.workflow_run.head_sha }}" --json number --jq '.[0].number')
+          if [ -n "$PR_NUMBER" ]; then
+            echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          else
+            echo "Could not determine PR number"
+            exit 1
+          fi
+        else
+          echo "Could not determine PR number from context"
+          exit 1
+        fi
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+
+    - name: Run LLM Dependency Bot
+      shell: bash
+      run: |
+        python3 ${{ github.action_path }}/src/agent.py
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        PR_NUMBER: ${{ steps.pr-number.outputs.number }}
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        AUTO_MERGE_ENABLED: ${{ inputs.auto-merge-enabled }}
+        MERGE_METHOD: ${{ inputs.merge-method }}
+        CRITICAL_DEPENDENCIES: ${{ inputs.critical-dependencies }}
