@@ -123,7 +123,9 @@ based on risk assessment, testing results, and contextual information.
 **Important:** Always explain your reasoning clearly, citing specific factors from the
 context and any tool results. Be conservative - when in doubt, require human approval."""
 
-    def __init__(self, github_token: str, repo: str, anthropic_key: str):
+    def __init__(
+        self, github_token: str, repo: str, anthropic_key: str, skip_author_check: bool = False
+    ):
         """
         Initialize the LLM Dependency Bot.
 
@@ -131,6 +133,7 @@ context and any tool results. Be conservative - when in doubt, require human app
             github_token: GitHub API token with repo permissions
             repo: Repository in format "owner/name"
             anthropic_key: Anthropic API key for Claude
+            skip_author_check: Skip author validation for testing purposes
         """
         self.github_token = github_token
         self.repo = repo
@@ -140,6 +143,7 @@ context and any tool results. Be conservative - when in doubt, require human app
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
+        self.skip_author_check = skip_author_check
 
         # Initialize Claude client
         self.anthropic = Anthropic(api_key=anthropic_key)
@@ -818,7 +822,7 @@ Please resolve the issues identified above before merging.
 
         # Check if from known dependency bots
         known_bots = ["dependabot[bot]", "dependabot", "renovate[bot]", "renovate"]
-        if author not in known_bots:
+        if not self.skip_author_check and author not in known_bots:
             return False
 
         # Additional validation: check labels or title
@@ -874,6 +878,7 @@ def main() -> None:
     repository = os.environ.get("GITHUB_REPOSITORY")
     pr_number_str = os.environ.get("PR_NUMBER")
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+    skip_author_check = os.environ.get("SKIP_AUTHOR_CHECK", "false").lower() == "true"
 
     # Validate required environment variables
     if not all([github_token, repository, pr_number_str, anthropic_key]):
@@ -895,7 +900,7 @@ def main() -> None:
         sys.exit(1)
 
     # Initialize and run the bot
-    bot = LLMDependencyBot(github_token, repository, anthropic_key)
+    bot = LLMDependencyBot(github_token, repository, anthropic_key, skip_author_check)
 
     try:
         bot.run(pr_number)
