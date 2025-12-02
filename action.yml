@@ -1,6 +1,6 @@
 name: LLM Dependency Bot
-description: 🤖 Autonomous AI agent powered by Claude 3.5 Sonnet that intelligently analyzes, decides, and acts on dependency updates with human-like reasoning
-author: Sean Zohar Farjun
+description: 🤖 AI agent for dependency management
+author: Sean Katz (SeanZoR)
 
 branding:
   icon: git-pull-request
