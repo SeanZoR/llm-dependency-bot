@@ -35,6 +35,16 @@ class RiskLevel(Enum):
     HIGH = "high"
     CRITICAL = "critical"
 
+    def get_indicator(self) -> str:
+        """Get visual indicator emoji for risk level."""
+        indicators = {
+            RiskLevel.LOW: "🟢 LOW",
+            RiskLevel.MEDIUM: "🟡 MEDIUM",
+            RiskLevel.HIGH: "🟠 HIGH",
+            RiskLevel.CRITICAL: "🔴 CRITICAL",
+        }
+        return indicators[self]
+
 
 class MergeDecision(Enum):
     """Possible merge decisions the agent can make."""
@@ -70,6 +80,21 @@ class PRContext:
     is_security_update: bool
     target_branch: str
     files_changed: list[str]
+
+
+@dataclass
+class DecisionResult:
+    """
+    Result of the decision-making process.
+
+    Contains decision, risk level, reasoning, and evidence collected.
+    """
+
+    decision: "MergeDecision"
+    risk_level: "RiskLevel"
+    reasoning: str
+    key_factors: list[str]
+    tools_called: list[str]
 
 
 class LLMDependencyBot:
@@ -513,7 +538,7 @@ context and any tool results. Be conservative - when in doubt, require human app
         else:
             return f"Unknown tool: {tool_name}"
 
-    def decide_with_llm(self, context: PRContext) -> tuple[MergeDecision, RiskLevel, str]:
+    def decide_with_llm(self, context: PRContext) -> DecisionResult:
         """
         DECISION LAYER: Use Claude to make intelligent merge decision.
 
@@ -527,9 +552,12 @@ context and any tool results. Be conservative - when in doubt, require human app
             context: Complete PR context
 
         Returns:
-            Tuple of (decision, risk_level, reasoning)
+            DecisionResult with decision, risk, reasoning, key factors, and tools used
         """
         print(f"\n🤖 Asking Claude to analyze PR #{context.number}...")
+
+        # Track which tools Claude calls
+        tools_called: list[str] = []
 
         # Check if this is a critical dependency
         is_critical = any(
@@ -599,6 +627,10 @@ Respond in JSON format:
                         tool_name = content_block.name
                         tool_input = content_block.input
 
+                        # Track tool usage
+                        if tool_name not in tools_called:
+                            tools_called.append(tool_name)
+
                         # Execute the tool
                         tool_result = self._execute_tool(tool_name, tool_input)
 
@@ -640,92 +672,169 @@ Respond in JSON format:
                 decision = MergeDecision[decision_data["decision"]]
                 risk = RiskLevel[decision_data["risk_level"]]
                 reasoning = decision_data["reasoning"]
+                key_factors = decision_data.get("key_factors", [])
 
                 print(f"   📋 Decision: {decision.value}")
                 print(f"   ⚖️  Risk: {risk.value}")
 
-                return decision, risk, reasoning
+                return DecisionResult(
+                    decision=decision,
+                    risk_level=risk,
+                    reasoning=reasoning,
+                    key_factors=key_factors,
+                    tools_called=tools_called,
+                )
             else:
                 print("   ⚠️  Could not parse JSON, using fallback logic")
-                return self._fallback_decision(context, final_text)
+                return self._fallback_decision(context, final_text, tools_called)
 
         except Exception as e:
             print(f"   ⚠️  Error parsing Claude's response: {e}")
-            return self._fallback_decision(context, final_text)
+            return self._fallback_decision(context, final_text, tools_called)
 
     def _fallback_decision(
-        self, context: PRContext, llm_response: str
-    ) -> tuple[MergeDecision, RiskLevel, str]:
+        self, context: PRContext, llm_response: str, tools_called: list[str]
+    ) -> DecisionResult:
         """
         Fallback decision logic if LLM response cannot be parsed.
 
         Args:
             context: PR context
             llm_response: Raw LLM response
+            tools_called: List of tools that were called
 
         Returns:
-            Tuple of (decision, risk_level, reasoning)
+            DecisionResult with fallback decision
         """
         reasoning = f"Fallback decision used due to parsing error.\n\n{llm_response[:500]}"
 
         if context.ci_status == "failure" or not context.mergeable:
-            return MergeDecision.DO_NOT_MERGE, RiskLevel.CRITICAL, reasoning
+            decision, risk = MergeDecision.DO_NOT_MERGE, RiskLevel.CRITICAL
         elif context.update_type == "major":
-            return MergeDecision.REQUIRE_APPROVAL, RiskLevel.HIGH, reasoning
+            decision, risk = MergeDecision.REQUIRE_APPROVAL, RiskLevel.HIGH
         elif context.is_security_update or context.update_type in ["minor", "patch"]:
-            return MergeDecision.AUTO_MERGE, RiskLevel.LOW, reasoning
+            decision, risk = MergeDecision.AUTO_MERGE, RiskLevel.LOW
         else:
-            return MergeDecision.REQUIRE_APPROVAL, RiskLevel.MEDIUM, reasoning
+            decision, risk = MergeDecision.REQUIRE_APPROVAL, RiskLevel.MEDIUM
 
-    def execute_action(
-        self, context: PRContext, decision: MergeDecision, risk: RiskLevel, reasoning: str
-    ) -> None:
+        return DecisionResult(
+            decision=decision,
+            risk_level=risk,
+            reasoning=reasoning,
+            key_factors=["Fallback logic applied due to parsing error"],
+            tools_called=tools_called,
+        )
+
+    def _format_comment(
+        self, context: PRContext, result: DecisionResult, decision_emoji: str, decision_text: str
+    ) -> str:
+        """
+        Format a structured comment with table, evidence, and reasoning.
+
+        Args:
+            context: PR context
+            result: Decision result with evidence
+            decision_emoji: Emoji for decision (✅, 👤, or ❌)
+            decision_text: Decision text to display
+
+        Returns:
+            Formatted comment body
+        """
+        # Build top summary table
+        update_info = f"`{context.old_version}` → `{context.new_version}` ({context.update_type})"
+
+        summary_table = f"""| Decision | Risk | Update |
+|----------|------|--------|
+| {decision_emoji} **{decision_text}** | {result.risk_level.get_indicator()} | {update_info} |"""
+
+        # Build evidence section (collapsible)
+        evidence_lines = []
+
+        # Tools called
+        if result.tools_called:
+            tool_checks = []
+            for tool in result.tools_called:
+                tool_name = tool.replace("_", " ").title()
+                tool_checks.append(f"- ✓ {tool_name}")
+            evidence_lines.append("**Tools Used:**\n" + "\n".join(tool_checks))
+
+        # Key findings
+        if result.key_factors:
+            key_findings = []
+            for factor in result.key_factors:
+                key_findings.append(f"- {factor}")
+            evidence_lines.append("\n**Key Findings:**\n" + "\n".join(key_findings))
+
+        # Metrics
+        metrics_lines = []
+        metrics_lines.append(f"- **Dependency:** `{context.dependency_name}`")
+        metrics_lines.append(f"- **Files Changed:** {len(context.files_changed)}")
+        if context.files_changed:
+            file_list = ", ".join(f"`{f}`" for f in context.files_changed[:3])
+            if len(context.files_changed) > 3:
+                file_list += f", ... ({len(context.files_changed) - 3} more)"
+            metrics_lines.append(f"- **Files:** {file_list}")
+        metrics_lines.append(f"- **CI Status:** {context.ci_status}")
+        if context.is_security_update:
+            metrics_lines.append("- **Security Update:** Yes ⚠️")
+
+        evidence_lines.append("\n**Metrics:**\n" + "\n".join(metrics_lines))
+
+        evidence_section = f"""<details>
+<summary><b>📊 Evidence & Analysis</b></summary>
+
+{chr(10).join(evidence_lines)}
+
+</details>"""
+
+        # Build reasoning section (collapsible)
+        reasoning_section = f"""<details>
+<summary><b>🤖 Claude's Detailed Reasoning</b></summary>
+
+{result.reasoning}
+
+</details>"""
+
+        # Build footer
+        footer = "🤖 *Powered by Claude 3.5 Sonnet*"
+
+        # Combine all sections
+        return f"""{summary_table}
+
+{evidence_section}
+
+{reasoning_section}
+
+{footer}"""
+
+    def execute_action(self, context: PRContext, result: DecisionResult) -> None:
         """
         ACTION LAYER: Execute the decided action.
 
         Args:
             context: PR context
-            decision: Merge decision
-            risk: Risk level
-            reasoning: Claude's reasoning
+            result: Decision result with all evidence
         """
-        print(f"\n🚀 Executing action: {decision.value}...")
+        print(f"\n🚀 Executing action: {result.decision.value}...")
 
-        if decision == MergeDecision.AUTO_MERGE:
-            self._auto_merge(context, risk, reasoning)
-        elif decision == MergeDecision.REQUIRE_APPROVAL:
-            self._request_review(context, risk, reasoning)
+        if result.decision == MergeDecision.AUTO_MERGE:
+            self._auto_merge(context, result)
+        elif result.decision == MergeDecision.REQUIRE_APPROVAL:
+            self._request_review(context, result)
         else:
-            self._add_blocking_comment(context, risk, reasoning)
+            self._add_blocking_comment(context, result)
 
-    def _auto_merge(self, context: PRContext, risk: RiskLevel, reasoning: str) -> None:
+    def _auto_merge(self, context: PRContext, result: DecisionResult) -> None:
         """Auto-merge the PR with explanation."""
         print(f"   🔀 Auto-merging PR #{context.number}...")
 
-        comment = f"""🤖 **LLM Dependency Bot**
-
-**Decision**: ✅ Auto-merge approved
-**Risk Level**: {risk.value.upper()}
-
-**Claude's Analysis**:
-{reasoning}
-
-**Context**:
-- Dependency: `{context.dependency_name}`
-- Update: `{context.old_version}` → `{context.new_version}` ({context.update_type})
-- CI Status: {context.ci_status}
-
-Merging automatically...
-
----
-*Powered by [Claude 3.5 Sonnet](https://www.anthropic.com/claude) - Autonomous AI for intelligent dependency management*
-"""
+        comment = self._format_comment(context, result, "✅", "Auto-merge")
         self._add_comment(context.number, comment)
 
         # Merge the PR
         merge_data = {
             "commit_title": f"🤖 {context.title}",
-            "commit_message": f"Auto-merged by LLM Dependency Bot\n\nRisk: {risk.value}\n\n{reasoning[:500]}",
+            "commit_message": f"Auto-merged by LLM Dependency Bot\n\nRisk: {result.risk_level.value}\n\n{result.reasoning[:500]}",
             "merge_method": "squash",
         }
 
@@ -738,28 +847,11 @@ Merging automatically...
             print(f"   ❌ Failed to merge: {e}")
             raise
 
-    def _request_review(self, context: PRContext, risk: RiskLevel, reasoning: str) -> None:
+    def _request_review(self, context: PRContext, result: DecisionResult) -> None:
         """Request human review for the PR."""
         print(f"   👤 Requesting human review for PR #{context.number}...")
 
-        comment = f"""🤖 **LLM Dependency Bot**
-
-**Decision**: 👤 Human review required
-**Risk Level**: {risk.value.upper()}
-
-**Claude's Analysis**:
-{reasoning}
-
-**Context**:
-- Dependency: `{context.dependency_name}`
-- Update: `{context.old_version}` → `{context.new_version}` ({context.update_type})
-- CI Status: {context.ci_status}
-
-Please review this update carefully before merging.
-
----
-*Powered by [Claude 3.5 Sonnet](https://www.anthropic.com/claude) - Autonomous AI for intelligent dependency management*
-"""
+        comment = self._format_comment(context, result, "👤", "Review Required")
         self._add_comment(context.number, comment)
 
         try:
@@ -769,29 +861,11 @@ Please review this update carefully before merging.
 
         print("   ✅ Added review request")
 
-    def _add_blocking_comment(self, context: PRContext, risk: RiskLevel, reasoning: str) -> None:
+    def _add_blocking_comment(self, context: PRContext, result: DecisionResult) -> None:
         """Add a blocking comment explaining why PR cannot be merged."""
         print(f"   🚫 Blocking PR #{context.number}...")
 
-        comment = f"""🤖 **LLM Dependency Bot**
-
-**Decision**: ❌ Cannot merge
-**Risk Level**: {risk.value.upper()}
-
-**Claude's Analysis**:
-{reasoning}
-
-**Context**:
-- Dependency: `{context.dependency_name}`
-- Update: `{context.old_version}` → `{context.new_version}` ({context.update_type})
-- CI Status: {context.ci_status}
-- Mergeable: {context.mergeable}
-
-Please resolve the issues identified above before merging.
-
----
-*Powered by [Claude 3.5 Sonnet](https://www.anthropic.com/claude) - Autonomous AI for intelligent dependency management*
-"""
+        comment = self._format_comment(context, result, "❌", "Do Not Merge")
         self._add_comment(context.number, comment)
         print("   ✅ Added blocking comment")
 
@@ -835,7 +909,7 @@ Please resolve the issues identified above before merging.
             or "update" in title_lower
         )
 
-    def run(self, pr_number: int) -> None:
+    def run(self, pr_number: int) -> Optional[DecisionResult]:
         """
         Main agent loop: Perceive → Decide → Act.
 
@@ -844,6 +918,9 @@ Please resolve the issues identified above before merging.
 
         Args:
             pr_number: Pull request number to analyze
+
+        Returns:
+            DecisionResult if successful, None if not a dependency PR
         """
         print(f"\n{'='*70}")
         print("🤖 LLM Dependency Bot - Autonomous AI Agent")
@@ -853,7 +930,7 @@ Please resolve the issues identified above before merging.
         # Validate this is a dependency PR
         if not self.is_dependency_pr(pr_number):
             print(f"❌ PR #{pr_number} is not a dependency PR. Exiting.")
-            return
+            return None
 
         print(f"✅ Confirmed PR #{pr_number} is a dependency PR\n")
 
@@ -861,14 +938,16 @@ Please resolve the issues identified above before merging.
         context = self.gather_pr_context(pr_number)
 
         # DECIDE: Let Claude make the decision using tools
-        decision, risk, reasoning = self.decide_with_llm(context)
+        result = self.decide_with_llm(context)
 
         # ACT: Execute Claude's decision
-        self.execute_action(context, decision, risk, reasoning)
+        self.execute_action(context, result)
 
         print(f"\n{'='*70}")
         print("✅ LLM Dependency Bot completed successfully")
         print(f"{'='*70}\n")
+
+        return result
 
 
 def main() -> None:
@@ -903,7 +982,23 @@ def main() -> None:
     bot = LLMDependencyBot(github_token, repository, anthropic_key, skip_author_check)
 
     try:
-        bot.run(pr_number)
+        result = bot.run(pr_number)
+
+        # Write GitHub Action outputs
+        if result:
+            github_output = os.environ.get("GITHUB_OUTPUT")
+            if github_output:
+                with open(github_output, "a") as f:
+                    f.write(f"decision={result.decision.value}\n")
+                    f.write(f"risk-level={result.risk_level.value}\n")
+                    # Escape multiline reasoning for output
+                    reasoning_escaped = (
+                        result.reasoning.replace("%", "%25")
+                        .replace("\n", "%0A")
+                        .replace("\r", "%0D")
+                    )
+                    f.write(f"reasoning={reasoning_escaped}\n")
+                print("\n✅ GitHub Action outputs set successfully")
     except Exception as e:
         print(f"\n❌ Bot failed with error: {e}")
         import traceback

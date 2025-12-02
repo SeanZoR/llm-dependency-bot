@@ -200,27 +200,45 @@ _*Minor updates auto-merge only if no breaking changes detected_
    - Reads: "Version 2.0 is fully backwards compatible, just drops IE11 support"
    - "CI passing, backwards compatible, not critical dependency"
    - **Decision:** AUTO_MERGE (Low risk)
-3. **Acts** - Merges with explanation:
+3. **Acts** - Merges with structured explanation:
 
 ```markdown
-🤖 **LLM Dependency Bot**
+| Decision | Risk | Update |
+|----------|------|--------|
+| ✅ **Auto-merge** | 🟢 LOW | `1.6.0` → `2.0.0` (major) |
 
-**Decision**: ✅ Auto-merge approved
-**Risk Level**: LOW
+<details>
+<summary><b>📊 Evidence & Analysis</b></summary>
 
-**Claude's Analysis**:
+**Tools Used:**
+- ✓ Fetch Release Notes
+- ✓ Analyze Diff
+
+**Key Findings:**
+- Backwards compatible API (confirmed from release notes)
+- Only drops IE11 support, no functional breaking changes
+- CI passing (all 127 tests successful)
+- No critical security advisories
+
+**Metrics:**
+- **Dependency:** `axios`
+- **Files Changed:** 2
+- **Files:** `package.json`, `package-lock.json`
+- **CI Status:** success
+
+</details>
+
+<details>
+<summary><b>🤖 Claude's Detailed Reasoning</b></summary>
+
 While this is a major version update, the release notes indicate it is fully
 backwards compatible with version 1.x. The only breaking change is dropping
 Internet Explorer 11 support, which does not affect this project. CI checks
 are passing with all tests successful. Safe to merge.
 
-**Key Factors:**
-- Backwards compatible API
-- CI passing (all 127 tests)
-- No critical security changes
-- Lock file only changes
+</details>
 
-Merging automatically...
+🤖 *Powered by Claude 3.5 Sonnet*
 ```
 
 ## 🔧 Extending the Bot
