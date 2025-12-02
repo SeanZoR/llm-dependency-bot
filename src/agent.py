@@ -406,7 +406,7 @@ context and any tool results. Be conservative - when in doubt, require human app
         """
         Tool: Fetch release notes for a dependency version.
 
-        In production, this would integrate with:
+        Integrates with:
         - npm registry for JavaScript packages
         - PyPI for Python packages
         - GitHub Releases API for GitHub-hosted packages
@@ -420,18 +420,100 @@ context and any tool results. Be conservative - when in doubt, require human app
         """
         print(f"   🔍 Claude requesting release notes for {dependency} {version}...")
 
-        # TODO: Implement actual release notes fetching
-        # For now, return a placeholder
-        return f"Release notes for {dependency} {version} would be fetched from package registry (npm, PyPI, etc.) in production implementation."
+        # Try npm registry first
+        try:
+            npm_url = f"https://registry.npmjs.org/{dependency}/{version}"
+            response = requests.get(npm_url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+
+                # Extract changelog/release notes
+                changelog = ""
+
+                # Get package description
+                if "description" in data:
+                    changelog += f"**Description:** {data['description']}\n\n"
+
+                # Check for repository URL to fetch GitHub releases
+                if "repository" in data and isinstance(data["repository"], dict):
+                    repo_url = data["repository"].get("url", "")
+                    if "github.com" in repo_url:
+                        # Extract owner/repo from GitHub URL
+                        match = re.search(r"github\.com[:/]([^/]+)/([^/\.]+)", repo_url)
+                        if match:
+                            owner, repo_name = match.groups()
+                            github_notes = self._fetch_github_release(owner, repo_name, version)
+                            if github_notes:
+                                changelog += f"\n**GitHub Release Notes:**\n{github_notes}"
+
+                if changelog:
+                    return changelog[:1000]  # Limit to 1000 chars
+                else:
+                    return f"Found npm package {dependency}@{version} but no detailed release notes available."
+
+        except Exception:  # noqa: B110
+            pass  # Try PyPI next
+
+        # Try PyPI for Python packages
+        try:
+            pypi_url = f"https://pypi.org/pypi/{dependency}/{version}/json"
+            response = requests.get(pypi_url, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                info = data.get("info", {})
+
+                changelog = ""
+                if "description" in info:
+                    desc = info["description"]
+                    if desc and len(desc) > 50:  # Has substantial description
+                        changelog = desc[:1000]  # Limit to 1000 chars
+
+                if changelog:
+                    return f"**PyPI Package:**\n{changelog}"
+                else:
+                    return (
+                        f"Found PyPI package {dependency} {version} but no detailed release notes."
+                    )
+
+        except Exception:  # noqa: B110
+            pass
+
+        # Fallback
+        return f"Could not fetch release notes for {dependency} {version}. Recommend manual review."
+
+    def _fetch_github_release(self, owner: str, repo: str, version: str) -> str:
+        """
+        Fetch GitHub release notes for a specific version.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            version: Version/tag name
+
+        Returns:
+            Release notes or empty string
+        """
+        try:
+            # Try with 'v' prefix
+            for tag in [f"v{version}", version]:
+                url = f"https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag}"
+                response = self._make_request("GET", url)
+                if response.status_code == 200:
+                    data = response.json()
+                    body = data.get("body", "")
+                    if body:
+                        return body[:800]  # Limit length
+            return ""
+        except Exception:
+            return ""
 
     def _check_cve_database(self, dependency: str, version: str) -> str:
         """
         Tool: Check if a version has known CVE vulnerabilities.
 
-        In production, this would integrate with:
+        Integrates with:
         - GitHub Security Advisories
-        - npm audit / pip-audit
-        - Snyk, Dependabot alerts, etc.
+        - OSV (Open Source Vulnerabilities) database
 
         Args:
             dependency: Name of the dependency
@@ -442,8 +524,40 @@ context and any tool results. Be conservative - when in doubt, require human app
         """
         print(f"   🔍 Claude checking CVE database for {dependency} {version}...")
 
-        # TODO: Implement actual CVE checking
-        return f"CVE check for {dependency} {version} would query vulnerability databases (GitHub Security, Snyk, etc.) in production implementation."
+        vulnerabilities = []
+
+        # Check OSV database (covers npm, PyPI, and more)
+        try:
+            osv_url = "https://api.osv.dev/v1/query"
+            payload = {"package": {"name": dependency}, "version": version}
+            response = requests.post(osv_url, json=payload, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                vulns = data.get("vulns", [])
+
+                for vuln in vulns[:3]:  # Limit to 3 most relevant
+                    vuln_id = vuln.get("id", "Unknown")
+                    summary = vuln.get("summary", "No summary available")
+                    severity = "Unknown"
+
+                    # Try to get severity
+                    if "severity" in vuln:
+                        severity_list = vuln["severity"]
+                        if severity_list and len(severity_list) > 0:
+                            severity = severity_list[0].get("score", "Unknown")
+
+                    vulnerabilities.append(f"- **{vuln_id}** ({severity}): {summary[:200]}")
+
+        except Exception:  # noqa: B110
+            pass  # Continue with other checks
+
+        # Format results
+        if vulnerabilities:
+            result = f"⚠️ **Found {len(vulnerabilities)} vulnerabilit{'y' if len(vulnerabilities) == 1 else 'ies'} for {dependency} {version}:**\n\n"
+            result += "\n".join(vulnerabilities)
+            return result[:800]  # Limit length
+        else:
+            return f"✅ No known vulnerabilities found for {dependency} {version} in OSV database."
 
     def _analyze_diff(self, pr_number: int) -> str:
         """

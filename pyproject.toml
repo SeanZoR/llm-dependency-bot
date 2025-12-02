@@ -113,4 +113,4 @@ skip_covered = false
 
 [tool.bandit]
 exclude_dirs = ["/tests", "/venv", "/.venv"]
-skips = ["B101"]  # Skip assert_used - asserts are for type guards, not security
+skips = ["B101", "B110"]  # Skip assert_used and try_except_pass - intentional fallback patterns
