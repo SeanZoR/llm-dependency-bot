@@ -5,14 +5,11 @@ This test suite demonstrates testing patterns for AI agents,
 including mocking LLM responses and GitHub API calls.
 """
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from src.agent import (
-    LLMDependencyBot,
-    RiskLevel,
-    MergeDecision,
-    PRContext,
-)
+
+from src.agent import LLMDependencyBot, MergeDecision, PRContext, RiskLevel
 
 
 @pytest.fixture
@@ -33,7 +30,7 @@ def bot(mock_github_token, mock_anthropic_key):
     return LLMDependencyBot(
         github_token=mock_github_token,
         repo="test-owner/test-repo",
-        anthropic_key=mock_anthropic_key
+        anthropic_key=mock_anthropic_key,
     )
 
 
@@ -57,7 +54,7 @@ def sample_pr_context():
         dependency_name="axios",
         is_security_update=False,
         target_branch="main",
-        files_changed=["package.json", "package-lock.json"]
+        files_changed=["package.json", "package-lock.json"],
     )
 
 
@@ -113,7 +110,7 @@ class TestSecurityDetection:
 
     def test_cve_in_body_detection(self, bot):
         """Test detection via CVE mention in body."""
-        labels = []
+        labels: list = []
         body = "This update fixes CVE-2024-1234"
 
         is_security = bot._is_security_update(labels, body)
@@ -122,7 +119,7 @@ class TestSecurityDetection:
 
     def test_vulnerability_keyword_detection(self, bot):
         """Test detection via vulnerability keyword."""
-        labels = []
+        labels: list = []
         body = "This release addresses a critical vulnerability"
 
         is_security = bot._is_security_update(labels, body)
@@ -142,39 +139,39 @@ class TestSecurityDetection:
 class TestDependencyPRDetection:
     """Test detection of dependency PRs."""
 
-    @patch('src.agent.LLMDependencyBot._make_request')
+    @patch("src.agent.LLMDependencyBot._make_request")
     def test_dependabot_pr_detection(self, mock_request, bot):
         """Test detection of Dependabot PR."""
         mock_request.return_value.json.return_value = {
             "user": {"login": "dependabot[bot]"},
             "title": "Bump axios from 1.0.0 to 1.1.0",
-            "labels": [{"name": "dependencies"}]
+            "labels": [{"name": "dependencies"}],
         }
 
         is_dep_pr = bot.is_dependency_pr(123)
 
         assert is_dep_pr is True
 
-    @patch('src.agent.LLMDependencyBot._make_request')
+    @patch("src.agent.LLMDependencyBot._make_request")
     def test_renovate_pr_detection(self, mock_request, bot):
         """Test detection of Renovate PR."""
         mock_request.return_value.json.return_value = {
             "user": {"login": "renovate[bot]"},
             "title": "Update axios to 1.1.0",
-            "labels": []
+            "labels": [],
         }
 
         is_dep_pr = bot.is_dependency_pr(123)
 
         assert is_dep_pr is True
 
-    @patch('src.agent.LLMDependencyBot._make_request')
+    @patch("src.agent.LLMDependencyBot._make_request")
     def test_non_dependency_pr(self, mock_request, bot):
         """Test non-dependency PR."""
         mock_request.return_value.json.return_value = {
             "user": {"login": "human-developer"},
             "title": "Add new feature",
-            "labels": []
+            "labels": [],
         }
 
         is_dep_pr = bot.is_dependency_pr(123)
@@ -189,37 +186,37 @@ class TestFallbackDecision:
         """Test fallback blocks on CI failure."""
         sample_pr_context.ci_status = "failure"
 
-        decision, risk, reasoning = bot._fallback_decision(sample_pr_context, "error")
+        result = bot._fallback_decision(sample_pr_context, "error", [])
 
-        assert decision == MergeDecision.DO_NOT_MERGE
-        assert risk == RiskLevel.CRITICAL
+        assert result.decision == MergeDecision.DO_NOT_MERGE
+        assert result.risk_level == RiskLevel.CRITICAL
 
     def test_fallback_major_update(self, bot, sample_pr_context):
         """Test fallback requires approval for major updates."""
         sample_pr_context.update_type = "major"
 
-        decision, risk, reasoning = bot._fallback_decision(sample_pr_context, "error")
+        result = bot._fallback_decision(sample_pr_context, "error", [])
 
-        assert decision == MergeDecision.REQUIRE_APPROVAL
-        assert risk == RiskLevel.HIGH
+        assert result.decision == MergeDecision.REQUIRE_APPROVAL
+        assert result.risk_level == RiskLevel.HIGH
 
     def test_fallback_security_update(self, bot, sample_pr_context):
         """Test fallback auto-merges security updates."""
         sample_pr_context.is_security_update = True
 
-        decision, risk, reasoning = bot._fallback_decision(sample_pr_context, "error")
+        result = bot._fallback_decision(sample_pr_context, "error", [])
 
-        assert decision == MergeDecision.AUTO_MERGE
-        assert risk == RiskLevel.LOW
+        assert result.decision == MergeDecision.AUTO_MERGE
+        assert result.risk_level == RiskLevel.LOW
 
     def test_fallback_patch_update(self, bot, sample_pr_context):
         """Test fallback auto-merges patch updates."""
         sample_pr_context.update_type = "patch"
 
-        decision, risk, reasoning = bot._fallback_decision(sample_pr_context, "error")
+        result = bot._fallback_decision(sample_pr_context, "error", [])
 
-        assert decision == MergeDecision.AUTO_MERGE
-        assert risk == RiskLevel.LOW
+        assert result.decision == MergeDecision.AUTO_MERGE
+        assert result.risk_level == RiskLevel.LOW
 
 
 class TestToolDefinitions:
@@ -251,13 +248,13 @@ class TestToolDefinitions:
 class TestCIStatus:
     """Test CI status parsing."""
 
-    @patch('src.agent.LLMDependencyBot._make_request')
+    @patch("src.agent.LLMDependencyBot._make_request")
     def test_all_checks_passing(self, mock_request, bot):
         """Test CI status when all checks pass."""
         mock_request.return_value.json.return_value = {
             "check_runs": [
                 {"status": "completed", "conclusion": "success"},
-                {"status": "completed", "conclusion": "success"}
+                {"status": "completed", "conclusion": "success"},
             ]
         }
 
@@ -266,13 +263,13 @@ class TestCIStatus:
         assert status == "success"
         assert conclusion == "success"
 
-    @patch('src.agent.LLMDependencyBot._make_request')
+    @patch("src.agent.LLMDependencyBot._make_request")
     def test_checks_failing(self, mock_request, bot):
         """Test CI status when checks fail."""
         mock_request.return_value.json.return_value = {
             "check_runs": [
                 {"status": "completed", "conclusion": "success"},
-                {"status": "completed", "conclusion": "failure"}
+                {"status": "completed", "conclusion": "failure"},
             ]
         }
 
@@ -281,13 +278,13 @@ class TestCIStatus:
         assert status == "failure"
         assert conclusion == "failure"
 
-    @patch('src.agent.LLMDependencyBot._make_request')
+    @patch("src.agent.LLMDependencyBot._make_request")
     def test_checks_pending(self, mock_request, bot):
         """Test CI status when checks are pending."""
         mock_request.return_value.json.return_value = {
             "check_runs": [
                 {"status": "in_progress", "conclusion": None},
-                {"status": "completed", "conclusion": "success"}
+                {"status": "completed", "conclusion": "success"},
             ]
         }
 

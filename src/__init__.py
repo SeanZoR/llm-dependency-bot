@@ -9,11 +9,18 @@ __version__ = "1.0.0"
 __author__ = "LLM Dependency Bot Contributors"
 __license__ = "MIT"
 
-from src.agent import LLMDependencyBot, MergeDecision, PRContext, RiskLevel
+from src.agent import (
+    DecisionResult,
+    LLMDependencyBot,
+    MergeDecision,
+    PRContext,
+    RiskLevel,
+)
 
 __all__ = [
     "LLMDependencyBot",
     "RiskLevel",
     "MergeDecision",
     "PRContext",
+    "DecisionResult",
 ]
